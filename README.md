@@ -214,3 +214,9 @@ entri nella vista dinamica e ci resti per la permanenza minima.
 `test/activity_monitor_test.dart` prova le tre regole delicate senza rete e
 senza aspettare: l'orologio è finto, così i venti secondi di permanenza passano
 in un'istruzione.
+
+---
+
+## Licenza
+
+MIT — vedi [LICENSE](LICENSE). Stessa licenza della dashboard che mostra.
