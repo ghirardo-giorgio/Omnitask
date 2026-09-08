@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/activity.dart';
 import '../modules/registry.dart';
 import '../services/activity_monitor.dart';
+import '../services/bridge_client.dart';
 import '../services/settings_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_metrics.dart';
@@ -19,10 +20,12 @@ class ActivitySettingsScreen extends StatefulWidget {
     super.key,
     required this.settings,
     required this.monitor,
+    required this.client,
   });
 
   final SettingsService settings;
   final ActivityMonitor monitor;
+  final BridgeClient client;
 
   @override
   State<ActivitySettingsScreen> createState() => _ActivitySettingsScreenState();
@@ -142,23 +145,44 @@ class _ActivitySettingsScreenState extends State<ActivitySettingsScreen> {
             ],
           ),
           const SizedBox(height: AppMetrics.gap * 2),
-          const Text(
-            'I moduli senza punteggio non entrano mai nella vista: Home Assistant '
-            'nel suo insieme e il meteo sono cose che si consultano, non che '
-            'chiamano.',
-            style: TextStyle(color: AppColors.faint, fontSize: 11),
-          ),
+          if (_notScorable.isNotEmpty)
+            Text(
+              'Non sono in elenco ${_notScorable.map((id) => moduleRegistry[id]?.title ?? id).join(', ')}: '
+              'per loro il PC non calcola un punteggio, quindi non entrano mai '
+              'nella vista. Sono cose che si consultano, non che chiamano.',
+              style: const TextStyle(color: AppColors.faint, fontSize: 11),
+            ),
         ],
       ),
     );
   }
 
+  /// Chi ha una soglia da regolare: solo i moduli per cui il PC sa
+  /// calcolare un punteggio.
+  ///
+  /// Gli altri non entrerebbero comunque nella vista, e mostrarne la riga
+  /// con l'interruttore inerte non informava di niente — sembrava un
+  /// guasto. Finché il ponte non l'ha detto si mostrano tutti: meglio una
+  /// riga di troppo per due secondi che una lista che si accorcia sotto le
+  /// dita appena arriva l'autenticazione.
+  Set<String> get _scorable => widget.client.scorableModules.isEmpty
+      ? moduleRegistry.keys.toSet()
+      : widget.client.scorableModules.toSet();
+
   /// L'ordine da mostrare: la preferenza salvata, e in coda — nell'ordine
   /// del catalogo — i moduli che non sono ancora stati spostati.
   List<String> _ordered() {
-    final known = rules.priority.where(moduleRegistry.containsKey).toList();
-    final rest = moduleRegistry.keys.where((id) => !known.contains(id));
+    final scorable = _scorable;
+    bool keep(String id) => moduleRegistry.containsKey(id) && scorable.contains(id);
+    final known = rules.priority.where(keep).toList();
+    final rest = moduleRegistry.keys.where((id) => keep(id) && !known.contains(id));
     return [...known, ...rest];
+  }
+
+  /// I moduli tolti dall'elenco, per dirlo invece di lasciare un buco.
+  List<String> get _notScorable {
+    final scorable = _scorable;
+    return moduleRegistry.keys.where((id) => !scorable.contains(id)).toList();
   }
 
   Future<void> _reorder(List<String> ids, int from, int to) async {

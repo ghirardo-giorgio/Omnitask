@@ -161,6 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   builder: (context) => ActivitySettingsScreen(
                     settings: settings,
                     monitor: widget.monitor,
+                    client: client,
                   ),
                 ));
                 setState(() {});

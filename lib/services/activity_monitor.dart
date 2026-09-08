@@ -195,8 +195,9 @@ class ActivityMonitor extends ChangeNotifier {
       final threshold = _rules.thresholdFor(entry.key);
       if (_inside.contains(entry.key)) {
         final held = now.difference(_enteredAt[entry.key] ?? now).inSeconds;
-        // Si esce più in basso di dove si entra, e non prima di aver fatto
-        // il proprio tempo.
+        // Scende sotto la soglia di uscita: smette di essere un allarme.
+        // Il posto però resta suo — a toglierglielo sarà qualcun altro
+        // entrando, se e quando succede.
         if (entry.value < threshold - _rules.hysteresis &&
             held >= _rules.minHoldSeconds) {
           _inside.remove(entry.key);
@@ -209,7 +210,7 @@ class ActivityMonitor extends ChangeNotifier {
     }
 
     // Chi sparisce dai punteggi — una GPU staccata, Home Assistant che non
-    // risponde più — esce come chi cala, con lo stesso tempo minimo.
+    // risponde più — smette di essere un allarme, con lo stesso tempo minimo.
     for (final id in _inside.toList()) {
       if (usable.containsKey(id)) continue;
       final held = now.difference(_enteredAt[id] ?? now).inSeconds;
@@ -221,8 +222,32 @@ class ActivityMonitor extends ChangeNotifier {
 
     calm = _inside.isEmpty;
 
-    // A riposo concorrono tutti; in allarme solo chi ha superato la soglia.
-    final contenders = calm ? usable.keys.toList() : _inside.toList();
+    // Chi ha diritto al posto che occupa.
+    //
+    // È la regola che tiene ferma la vista: una scheda non se ne va perché
+    // il suo punteggio è calato, se ne va quando qualcun altro entra a
+    // prendere il suo posto. Prima si assottigliava mentre la guardavi —
+    // tre schede diventavano due, poi una, poi ricomparivano — e quel
+    // movimento non serviva a nessuno, perché nessuno stava aspettando quel
+    // posto.
+    //
+    // Vale per la pagina che si vede. In coda, dove nessuno sta guardando,
+    // chi non è più in allarme lascia il posto: tenerlo vorrebbe dire
+    // accumulare pagine di roba vecchia da far ruotare.
+    final keeps = <String>[];
+    for (var seat = 0; seat < _seats.length; seat++) {
+      final id = _seats[seat];
+      // Modulo spento o escluso dall'utente: quella è una decisione, non un
+      // capriccio dei punteggi, e ha effetto subito.
+      if (!usable.containsKey(id)) continue;
+      if (seat < _capacity || _inside.contains(id)) keeps.add(id);
+    }
+
+    final contenders = <String>{
+      ...keeps,
+      if (calm) ...usable.keys else ..._inside,
+    }.toList();
+
     _assignSeats(contenders, usable, queue: !calm);
 
     _active = [
@@ -331,6 +356,29 @@ class ActivityMonitor extends ChangeNotifier {
         continue;
       }
 
+      // Un posto occupato da chi non è più in allarme è un posto scaduto:
+      // chi arriva se lo prende senza dover dimostrare niente. È il caso
+      // normale — la CPU si calma, il disco comincia a riempirsi, e il
+      // secondo prende il posto del primo.
+      var expired = -1;
+      for (var seat = 0; seat < _capacity && seat < _seats.length; seat++) {
+        if (_inside.contains(_seats[seat])) continue;
+        if (expired < 0 || scoreOf(_seats[seat]) < scoreOf(_seats[expired])) {
+          expired = seat;
+        }
+      }
+
+      if (expired >= 0 && !calm) {
+        // Il posto era scaduto e ora è di qualcun altro: chi lo lascia se ne
+        // va davvero, non finisce in coda. In coda ci si sta per aspettare
+        // il proprio turno di rotazione, e chi non è più in allarme non ha
+        // nessun turno da aspettare.
+        _seats[expired] = id;
+        continue;
+      }
+
+      // Tutti ancora in allarme (o siamo a riposo, dove nessuno lo è): per
+      // togliere il posto a qualcuno bisogna superarlo di una fascia intera.
       var weakest = 0;
       for (var seat = 1; seat < _capacity && seat < _seats.length; seat++) {
         if (scoreOf(_seats[seat]) < scoreOf(_seats[weakest])) weakest = seat;

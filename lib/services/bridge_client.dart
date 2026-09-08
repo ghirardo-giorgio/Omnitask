@@ -64,6 +64,15 @@ class BridgeClient extends ChangeNotifier {
   String? hostName;
   List<String> availableModules = const [];
 
+  /// I moduli per cui il PC sa calcolare un punteggio. Gli altri non entrano
+  /// mai nella vista dinamica, e la schermata delle soglie li toglie
+  /// dall'elenco invece di mostrarne la riga con l'interruttore morto.
+  ///
+  /// Lo dichiara il ponte perché è lui ad avere le formule: dedurlo qui
+  /// vorrebbe dire tenerne una seconda copia, e la prima a cambiare
+  /// resterebbe da sola.
+  List<String> scorableModules = const [];
+
   /// La dashboard e' spenta: i numeri che si vedono sono vecchi, e dirlo e'
   /// meglio che lasciarli fermi facendo finta.
   String? dashboardError;
@@ -204,6 +213,10 @@ class BridgeClient extends ChangeNotifier {
           final modules = message['modules'];
           if (modules is List) {
             availableModules = modules.map((m) => m.toString()).toList(growable: false);
+          }
+          final scorable = message['scorable'];
+          if (scorable is List) {
+            scorableModules = scorable.map((m) => m.toString()).toList(growable: false);
           }
           // La sottoscrizione riparte da sola dopo ogni caduta: il ponte non
           // si ricorda chi guardava cosa, e non deve — un client che torna

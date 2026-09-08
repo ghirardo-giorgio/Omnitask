@@ -62,6 +62,13 @@ soglie (l'icona del tachimetro):
 - chi è entrato resta almeno venti secondi anche se crolla subito: una card che compare e
   sparisce a ogni picco è peggio che non mostrarla;
 - l'ordine è per urgenza, così il primo che si vede è il più grave;
+- **una scheda esce solo quando un'altra entra a prenderne il posto.** Se in questo
+  momento ci sono tre schede, restano tre: un punteggio che cala non basta a mandarne
+  via una, perché nessuno sta aspettando quel posto. Prima la vista si assottigliava
+  mentre la guardavi — tre schede diventavano due, poi una, poi ricomparivano — per un
+  movimento che non serviva a nessuno. Un posto occupato da chi non è più in allarme è
+  «scaduto»: chi arriva se lo prende senza dover dimostrare niente, e chi lo lascia se
+  ne va davvero invece di finire in coda;
 - **chi è a schermo ci resta finché non è rimpiazzato.** I posti non si
   ricalcolano a ogni campione: prima bastava che la RAM passasse da 52 a 53 per
   scavalcare la rete e far scambiare due card sotto gli occhi di chi le stava

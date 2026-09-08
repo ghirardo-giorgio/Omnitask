@@ -34,15 +34,15 @@ void main() {
           reason: 'sopra la soglia di uscita (70) deve restare');
     });
 
-    test('esce sotto 70', () {
+    test('sotto 70 non è più un allarme, ma il posto resta suo', () {
       monitor.update({'cpu': 82, 'disks': 91});
       clock.advance(60);
       monitor.update({'cpu': 69, 'disks': 91});
-      // Il disco tiene la vista in allarme, quindi l'uscita della CPU si
-      // vede: se fosse rimasta sola rientrerebbe come «tutto tranquillo»,
-      // che è un'altra cosa e ha un suo test.
-      expect(monitor.calm, isFalse);
-      expect(monitor.active.map((m) => m.id).toList(), ['disks']);
+      // Non è più in allarme — ed è questo che cambia — ma nessuno sta
+      // aspettando quel posto, quindi non lo lascia. L'ordine è quello di
+      // partenza: il disco stava già davanti, entrato con un punteggio più
+      // alto.
+      expect(monitor.active.map((m) => m.id).toList(), ['disks', 'cpu']);
     });
 
     test('uscito dall\'allarme, a riposo torna come tranquillo', () {
@@ -63,7 +63,7 @@ void main() {
   });
 
   group('permanenza minima', () {
-    test('un picco di un secondo resta dentro venti secondi', () {
+    test('una scheda appena entrata non viene sostituita subito', () {
       monitor.update({'cpu': 95});
       expect(monitor.active.single.id, 'cpu');
 
@@ -72,11 +72,14 @@ void main() {
       expect(monitor.active.map((m) => m.id), contains('cpu'),
           reason: 'crollata subito, ma non ha fatto il suo tempo');
 
+      // Passato il tempo minimo il posto è scaduto, ma la CPU se ne va solo
+      // perché c'era qualcuno pronto a prenderlo — con i posti liberi
+      // sarebbe rimasta.
       clock.advance(19);
+      monitor.setCapacity(3);
       monitor.update({'cpu': 3, 'disks': 88});
-      expect(monitor.calm, isFalse);
-      expect(monitor.active.map((m) => m.id).toList(), ['disks'],
-          reason: 'fatto il suo tempo ed è crollata, esce');
+      expect(monitor.active.map((m) => m.id), containsAll(['cpu', 'disks']),
+          reason: 'ci sono tre posti: il disco si siede accanto, non al posto');
     });
 
     test('vale anche per un modulo che sparisce dai punteggi', () {
@@ -203,9 +206,12 @@ void main() {
           reason: 'chi è seduto resta dov\'è');
     });
 
-    test('chi esce libera il posto e i successivi scalano', () {
+    test('chi viene spento libera il posto e i successivi scalano', () {
       monitor.update({'net': 91, 'ram': 90, 'cpu': 89});
       clock.advance(60);
+      // Spegnere un modulo è una decisione, non un capriccio dei punteggi:
+      // ha effetto subito, senza aspettare un sostituto.
+      monitor.candidates = {'net', 'cpu'};
       monitor.update({'net': 91, 'ram': 50, 'cpu': 89});
       expect(monitor.active.map((m) => m.id).toList(), ['net', 'cpu']);
     });
@@ -241,15 +247,76 @@ void main() {
     });
   });
 
+  group('si esce solo per sostituzione', () {
+    test('tre schede restano tre anche se una si calma', () {
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      expect(monitor.active.length, 3);
+
+      // La CPU crolla, e nessuno sta aspettando il suo posto. Prima la vista
+      // si assottigliava da sola — tre schede diventavano due — per un
+      // movimento che non serviva a nessuno.
+      clock.advance(60);
+      monitor.update({'cpu': 5, 'ram': 90, 'net': 85});
+      expect(monitor.active.length, 3);
+      expect(monitor.active.map((m) => m.id), contains('cpu'));
+    });
+
+    test('quando arriva una quarta, la scaduta le lascia il posto', () {
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      clock.advance(60);
+      monitor.update({'cpu': 5, 'ram': 90, 'net': 85});
+      expect(monitor.active.map((m) => m.id), contains('cpu'));
+
+      // Il disco entra in allarme: il posto scaduto della CPU è suo, e non
+      // deve dimostrare nessun margine per prenderlo.
+      monitor.update({'cpu': 5, 'ram': 90, 'net': 85, 'disks': 82});
+      expect(monitor.active.length, 3);
+      expect(monitor.active.map((m) => m.id), contains('disks'));
+      expect(monitor.active.map((m) => m.id), isNot(contains('cpu')));
+    });
+
+    test('con un posto libero il nuovo si siede senza cacciare nessuno', () {
+      monitor.setCapacity(4);
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      clock.advance(60);
+      monitor.update({'cpu': 5, 'ram': 90, 'net': 85, 'disks': 82});
+      expect(monitor.active.length, 4,
+          reason: 'c\'era posto: la CPU calata non c\'entra niente');
+      expect(monitor.active.map((m) => m.id), contains('cpu'));
+    });
+
+    test('se sono tutte in allarme serve ancora il margine di una fascia', () {
+      monitor.update({'cpu': 85, 'ram': 84, 'net': 83});
+      // Stessa fascia del più debole: nessuno è scaduto, quindi il margine
+      // serve eccome.
+      monitor.update({'cpu': 85, 'ram': 84, 'net': 83, 'temps': 88});
+      expect(monitor.active.map((m) => m.id).toList(),
+          ['cpu', 'ram', 'net', 'temps']);
+    });
+
+    test('a riposo nessuno viene sostituito senza margine', () {
+      monitor.update({'cpu': 12, 'ram': 11, 'net': 10});
+      final seated = monitor.active.map((m) => m.id).toList();
+      // A riposo sono tutti «scaduti» per definizione: senza la guardia, il
+      // primo arrivato con un punto in più caccerebbe qualcuno a ogni giro.
+      monitor.update({'cpu': 12, 'ram': 11, 'net': 10, 'temps': 13});
+      expect(monitor.active.map((m) => m.id).toList(), seated);
+    });
+  });
+
   group('niente balletto', () {
     test('chi oscilla intorno alla soglia rientra al posto suo', () {
       monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
       expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'ram', 'net']);
 
-      // La RAM scende sotto la soglia di uscita e se ne va.
+      // La RAM viene spenta dall'utente e se ne va.
       clock.advance(60);
+      monitor.candidates = {'cpu', 'net'};
       monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
       expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'net']);
+
+      // Riaccesa.
+      monitor.candidates = {'cpu', 'ram', 'net'};
 
       // Risale e rientra: prima ricompariva in fondo, e a ogni oscillazione
       // la si vedeva saltare da una posizione all'altra.
@@ -261,6 +328,7 @@ void main() {
     test('il posto non resta prenotato per sempre', () {
       monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
       clock.advance(60);
+      monitor.candidates = {'cpu', 'net'};
       monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
 
       // Passati due minuti la memoria scade: chi torna si accoda come un
@@ -268,6 +336,7 @@ void main() {
       // frattempo.
       clock.advance(130);
       monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
+      monitor.candidates = {'cpu', 'ram', 'net'};
       monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
       expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'net', 'ram']);
     });
