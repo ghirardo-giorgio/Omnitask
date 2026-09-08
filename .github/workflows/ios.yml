@@ -1,0 +1,64 @@
+# Costruisce l'IPA di Omnitask su un Mac vero.
+#
+# Serve perche' la build iOS non si puo' fare da Linux: `flutter build` su host
+# Linux non ha nemmeno il sottocomando `ios`, e il compilatore che trasforma il
+# Dart in codice ARM (gen_snapshot) Flutter lo distribuisce solo come binario
+# macOS. Gli altri due pezzi — l'engine e l'SDK iPhoneOS — sulla macchina di
+# sviluppo ci sono gia'.
+#
+# L'IPA esce NON firmato apposta: la firma la mette xtool sul portatile, con
+# l'Apple ID gratuito, al momento di installare. Un runner non ha i certificati
+# e non deve averli.
+#
+#   xtool install Omnitask.ipa
+name: IPA per iPhone
+
+on:
+  push:
+    branches: [main]
+  # Cosi' si puo' lanciare a mano dalla pagina Actions, senza dover per forza
+  # spingere un commit per rifare l'IPA.
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # La stessa versione della macchina di sviluppo: una build che esce
+          # da qui deve essere quella che si prova in locale.
+          flutter-version: '3.41.4'
+          channel: stable
+          cache: true
+
+      - name: Dipendenze
+        run: flutter pub get
+
+      - name: Analisi e test
+        # I test dal vivo si saltano da soli: qui non c'e' nessun ponte in
+        # ascolto, e non e' un guasto.
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Build iOS senza firma
+        run: flutter build ios --release --no-codesign
+
+      - name: Impacchetta l'IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -R Runner.app Payload/
+          zip -qry "$GITHUB_WORKSPACE/Omnitask.ipa" Payload
+          cd "$GITHUB_WORKSPACE"
+          ls -lh Omnitask.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Omnitask-ipa
+          path: Omnitask.ipa
+          retention-days: 30
