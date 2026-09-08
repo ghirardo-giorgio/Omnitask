@@ -69,7 +69,12 @@ soglie (l'icona del tachimetro):
   qualcuno che supera il più debole di una fascia intera — dieci punti, la stessa
   unità delle preferenze. Senza quel margine due moduli che oscillano intorno allo
   stesso valore si passerebbero il posto all'infinito, che è il difetto di prima
-  spostato di un livello.
+  spostato di un livello;
+- **chi esce lascia detto dov'era**: se rientra entro due minuti riprende il suo posto
+  invece di ricomparire in fondo. Un modulo che oscilla intorno alla propria soglia —
+  la CPU sotto un carico a raffiche — entrava e usciva, e a ogni rientro la si vedeva
+  saltare da una posizione all'altra. Oltre i due minuti la memoria scade, altrimenti
+  uno che torna dopo un'ora scavalcherebbe chi nel frattempo si è seduto.
 
 **La lista delle soglie è anche la lista delle priorità**: si trascina per maniglia e l'ordine
 che ne esce è la tua preferenza. Non scavalca l'urgenza — un disco in avaria resta in cima

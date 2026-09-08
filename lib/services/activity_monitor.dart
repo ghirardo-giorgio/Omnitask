@@ -43,6 +43,28 @@ class ActivityMonitor extends ChangeNotifier {
   /// ricostruita da zero a ogni campione — è tutta la stabilità della vista.
   final List<String> _seats = [];
 
+  /// Dove sedeva chi è appena uscito, e da quando è fuori.
+  ///
+  /// Un modulo che oscilla intorno alla propria soglia esce e rientra; senza
+  /// questa memoria rientrerebbe in fondo, e ogni giro lo vedresti saltare da
+  /// una posizione all'altra. Con la memoria si rimette dov'era, e il
+  /// movimento sparisce.
+  final Map<String, int> _lastSeat = {};
+  final Map<String, DateTime> _leftAt = {};
+
+  /// Per quanto si tiene il posto a chi è uscito. Oltre, il posto è di
+  /// chiunque: ricordarlo per sempre vorrebbe dire che un modulo tornato
+  /// dopo un'ora scavalca chi nel frattempo si è seduto.
+  static const int seatMemorySeconds = 120;
+
+  /// I candidati in ordine di merito, **senza** il taglio della capienza.
+  ///
+  /// Serve alla vista per contare quanti riquadri entrano nello schermo. Con
+  /// i soli moduli attivi non si poteva: a riposo sono già tagliati alla
+  /// capienza, quindi tre entravano in tre posti e la capienza non poteva
+  /// crescere mai — un cane che si mordeva la coda.
+  List<ActiveModule> ranked = const [];
+
   /// Quanti riquadri entrano in una pagata di schermo. Lo misura la vista,
   /// che è l'unica a sapere quanto è alto lo schermo e quanto occupa ogni
   /// modulo coi dati di adesso; qui si parte da tre, che è il minimo sotto
@@ -213,6 +235,22 @@ class ActivityMonitor extends ChangeNotifier {
         ),
     ];
 
+    // La graduatoria intera: chi siede, e poi chi siederebbe. La vista ci
+    // conta sopra per sapere quanti riquadri entrano nello schermo, e le
+    // servono anche quelli che al momento non sono in pagina.
+    final waiting = contenders.where((id) => !_seats.contains(id)).toList()
+      ..sort((a, b) => (usable[b] ?? 0).compareTo(usable[a] ?? 0));
+    ranked = [
+      ..._active,
+      for (final id in waiting)
+        ActiveModule(
+          id: id,
+          score: usable[id] ?? 0,
+          enteredAt: _enteredAt[id] ?? now,
+          calm: calm,
+        ),
+    ];
+
     if (_page >= pageCount) _page = 0;
   }
 
@@ -234,7 +272,26 @@ class ActivityMonitor extends ChangeNotifier {
     Map<String, double> usable, {
     required bool queue,
   }) {
+    final now = _now();
+
+    // Chi esce lascia detto dov'era seduto: se rientra a breve ci torna,
+    // invece di ricomparire in fondo a ogni oscillazione.
+    for (var seat = 0; seat < _seats.length; seat++) {
+      final id = _seats[seat];
+      if (!contenders.contains(id)) {
+        _lastSeat[id] = seat;
+        _leftAt[id] = now;
+      }
+    }
     _seats.removeWhere((id) => !contenders.contains(id));
+
+    // Le memorie scadute si buttano, o un posto resterebbe prenotato per
+    // sempre a chi non torna.
+    _leftAt.removeWhere((id, when) {
+      final stale = now.difference(when).inSeconds > seatMemorySeconds;
+      if (stale) _lastSeat.remove(id);
+      return stale;
+    });
 
     // A riposo non c'è una coda: quello che non entra nella pagina non si
     // mostra affatto, invece di far ruotare pagine di moduli tranquilli.
@@ -258,6 +315,16 @@ class ActivityMonitor extends ChangeNotifier {
       });
 
     for (final id in incoming) {
+      // Chi torna presto riprende il posto che aveva, se c'è ancora spazio
+      // per infilarcelo: è ciò che toglie il balletto ai moduli che
+      // oscillano intorno alla loro soglia.
+      final remembered = _lastSeat.remove(id);
+      _leftAt.remove(id);
+      if (remembered != null && remembered <= _seats.length && _seats.length < _capacity) {
+        _seats.insert(remembered, id);
+        continue;
+      }
+
       // Un posto libero nella pagina che si vede: ci si accomoda e basta.
       if (_seats.length < _capacity) {
         _seats.add(id);

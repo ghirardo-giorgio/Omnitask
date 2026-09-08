@@ -33,16 +33,24 @@ class DynamicView extends StatelessWidget {
   /// riempie finché ci sta, guardando quanto ogni modulo dichiara di
   /// occupare coi dati che ha adesso.
   ///
-  /// Si contano i moduli in vista nell'ordine in cui siedono: la capienza
-  /// deve valere per quello che si vedrà davvero, non per una media.
+  /// Si conta sulla graduatoria intera, non sui soli moduli in pagina.
+  ///
+  /// Con quelli non funzionava, e il difetto era circolare: a riposo i
+  /// moduli in vista sono già tagliati alla capienza, quindi tre riquadri
+  /// entravano in tre posti e la capienza non poteva crescere mai. La
+  /// graduatoria contiene anche chi siederebbe, e non dipende da quanti
+  /// posti ci sono: è ciò che rompe il cerchio.
   int _capacityFor(double available) {
     var used = 0.0;
     var fit = 0;
-    for (final module in monitor.active) {
+    for (final module in monitor.ranked) {
       final spec = moduleRegistry[module.id];
       if (spec == null) continue;
       used += spec.height(snapshot);
-      if (used > available) break;
+      // Un filo di tolleranza: senza, un riquadro che sfora di due punti
+      // fa scendere la capienza, al giro dopo ci sta di nuovo, e le pagine
+      // si mettono a rimbalzare fra due impaginazioni diverse.
+      if (used > available * 1.05) break;
       fit++;
     }
     // Il minimo di tre resta anche quando i riquadri sono alti: una pagina da

@@ -241,10 +241,66 @@ void main() {
     });
   });
 
+  group('niente balletto', () {
+    test('chi oscilla intorno alla soglia rientra al posto suo', () {
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'ram', 'net']);
+
+      // La RAM scende sotto la soglia di uscita e se ne va.
+      clock.advance(60);
+      monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
+      expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'net']);
+
+      // Risale e rientra: prima ricompariva in fondo, e a ogni oscillazione
+      // la si vedeva saltare da una posizione all'altra.
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'ram', 'net'],
+          reason: 'torna dov\'era, non in coda');
+    });
+
+    test('il posto non resta prenotato per sempre', () {
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      clock.advance(60);
+      monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
+
+      // Passati due minuti la memoria scade: chi torna si accoda come un
+      // arrivato qualunque, altrimenti scavalcherebbe chi si è seduto nel
+      // frattempo.
+      clock.advance(130);
+      monitor.update({'cpu': 95, 'ram': 40, 'net': 85});
+      monitor.update({'cpu': 95, 'ram': 90, 'net': 85});
+      expect(monitor.active.map((m) => m.id).toList(), ['cpu', 'net', 'ram']);
+    });
+
+    test('due moduli appaiati non si scambiano di posto', () {
+      // Stesso punteggio, e ogni campione lo fa oscillare di un soffio:
+      // è il caso che faceva ballare le card.
+      monitor.update({'cpu': 90, 'gpu': 90, 'net': 85});
+      final order = monitor.active.map((m) => m.id).toList();
+
+      for (final swing in [0.4, -0.3, 0.2, -0.5]) {
+        monitor.update({'cpu': 90 + swing, 'gpu': 90 - swing, 'net': 85});
+        expect(monitor.active.map((m) => m.id).toList(), order);
+      }
+    });
+  });
+
   group('capienza', () {
     test('sotto tre non si scende', () {
       monitor.setCapacity(1);
       expect(monitor.capacity, 3);
+    });
+
+    test('la graduatoria va oltre i posti, o la capienza non crescerebbe mai', () {
+      monitor.update({'cpu': 12, 'ram': 11, 'net': 10, 'temps': 9, 'disks': 8});
+      expect(monitor.calm, isTrue);
+      expect(monitor.active.length, 3, reason: 'i posti sono tre');
+      // Su questi la vista conta quanti riquadri entrano nello schermo. Con
+      // i soli tre seduti la risposta sarebbe sempre «tre», qualunque sia
+      // l'altezza: tre entrano in tre posti, e la capienza non poteva
+      // crescere mai.
+      expect(monitor.ranked.length, 5);
+      expect(monitor.ranked.first.id, 'cpu');
     });
 
     test('con più posti non si ruota, perché entrano tutti', () {
