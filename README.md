@@ -215,6 +215,39 @@ entri nella vista dinamica e ci resti per la permanenza minima.
 senza aspettare: l'orologio è finto, così i venti secondi di permanenza passano
 in un'istruzione.
 
+## Installare su iPhone
+
+La build iOS non si puo' fare da Linux: `flutter build` su host Linux non ha nemmeno il
+sottocomando `ios`, e il compilatore che trasforma il Dart in codice ARM
+(`gen_snapshot`) Flutter lo distribuisce solo come binario macOS. Gli altri due pezzi —
+l'engine `Flutter.xcframework` e l'SDK iPhoneOS che porta xtool — su una macchina Linux
+ci sono gia', ma senza il terzo non si va da nessuna parte.
+
+Quindi l'IPA lo costruisce un Mac vero su GitHub Actions
+([`.github/workflows/ios.yml`](.github/workflows/ios.yml)) a ogni push, e la firma la
+mette xtool sul portatile, con un Apple ID gratuito, al momento di installare. Un runner
+in cloud non ha i certificati di nessuno e non deve averli.
+
+```bash
+./tools/install_ios.py          # scarica l'ipa dall'ultima build e installa
+./tools/install_ios.py --local  # usa l'ipa gia' scaricato
+./tools/install_ios.py --run    # installa e avvia l'app
+```
+
+Al primo avvio l'iPhone dira' che lo sviluppatore non e' fidato: **Impostazioni ›
+Generali › VPN e gestione dispositivo**, autorizza il tuo Apple ID.
+
+Lo script esiste per due dettagli che a mano si dimenticano. xtool vuole un tty vero per
+scriverci i propri prompt — senza, crasha a «Provisioning 33%» con un errore che sembra
+ambientale e invece e' una domanda che non e' riuscita ad arrivare — e non esce da solo
+alla fine, perche' dopo `[Installing]` c'e' una fase `[Verifying]` la cui barra a volte
+non si vede. Lo script alloca uno pseudo-terminale, inoltra quello che scrivi, e chiude
+quando l'installazione e' arrivata in fondo.
+
+Per rifare l'IPA dopo una modifica: `git push`, o «Run workflow» nella pagina Actions.
+
+---
+
 ---
 
 ## Licenza
