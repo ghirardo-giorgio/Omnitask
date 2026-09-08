@@ -141,3 +141,14 @@ Color _batteryColor(double? percent, bool charging) {
   if (percent <= 30) return AppColors.warning;
   return AppColors.ok;
 }
+
+// --- quanto occupano -------------------------------------------------------
+
+double phonesHeight(Snapshot snapshot) {
+  final phones = snapshot['phones'];
+  if (phones == null || phones['ok'] == false) return AppMetrics.cardWithChart();
+  final devices = (phones['devices'] as List?) ?? const [];
+  final paired = devices.whereType<Map>().where((d) => d['paired'] == true).length;
+  if (paired == 0) return AppMetrics.cardWithChart();
+  return AppMetrics.cardWithGrid(paired, 2, AppMetrics.donutTile);
+}

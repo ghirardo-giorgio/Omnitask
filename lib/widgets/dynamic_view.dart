@@ -26,6 +26,31 @@ class DynamicView extends StatelessWidget {
   final ActivityMonitor monitor;
   final Snapshot snapshot;
 
+  /// Quanti riquadri entrano in [available] punti di altezza.
+  ///
+  /// Un numero fisso sbagliava in tutte e due le direzioni: tre card leggere
+  /// lasciavano mezzo schermo vuoto, tre card alte già traboccavano. Qui si
+  /// riempie finché ci sta, guardando quanto ogni modulo dichiara di
+  /// occupare coi dati che ha adesso.
+  ///
+  /// Si contano i moduli in vista nell'ordine in cui siedono: la capienza
+  /// deve valere per quello che si vedrà davvero, non per una media.
+  int _capacityFor(double available) {
+    var used = 0.0;
+    var fit = 0;
+    for (final module in monitor.active) {
+      final spec = moduleRegistry[module.id];
+      if (spec == null) continue;
+      used += spec.height(snapshot);
+      if (used > available) break;
+      fit++;
+    }
+    // Il minimo di tre resta anche quando i riquadri sono alti: una pagina da
+    // due card con la rotazione che parte è peggio di un filo di
+    // scorrimento.
+    return fit < 3 ? 3 : fit;
+  }
+
   @override
   Widget build(BuildContext context) {
     final page = monitor.currentPage;
@@ -39,11 +64,25 @@ class DynamicView extends StatelessWidget {
         children: [
           _Header(monitor: monitor),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 350),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              child: page.isEmpty
+            child: LayoutBuilder(builder: (context, constraints) {
+              // La capienza si comunica al monitor dopo il frame: cambiarla
+              // qui dentro vorrebbe dire notificare i listener durante il
+              // layout, che Flutter non permette.
+              final seats = _capacityFor(
+                constraints.maxHeight -
+                    AppMetrics.gapSmall -
+                    AppMetrics.cardPadding,
+              );
+              if (seats != monitor.capacity) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => monitor.setCapacity(seats),
+                );
+              }
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 350),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: page.isEmpty
                   ? const _Empty()
                   : ListView(
                       // La chiave dice all'AnimatedSwitcher che è un'altra
@@ -66,7 +105,8 @@ class DynamicView extends StatelessWidget {
                             ),
                       ],
                     ),
-            ),
+              );
+            }),
           ),
         ],
       ),

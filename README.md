@@ -61,7 +61,15 @@ soglie (l'icona del tachimetro):
   modulo che oscilla intorno al valore di taglio entrerebbe e uscirebbe a ogni campione;
 - chi è entrato resta almeno venti secondi anche se crolla subito: una card che compare e
   sparisce a ogni picco è peggio che non mostrarla;
-- l'ordine è per urgenza, così il primo che si vede è il più grave.
+- l'ordine è per urgenza, così il primo che si vede è il più grave;
+- **chi è a schermo ci resta finché non è rimpiazzato.** I posti non si
+  ricalcolano a ogni campione: prima bastava che la RAM passasse da 52 a 53 per
+  scavalcare la rete e far scambiare due card sotto gli occhi di chi le stava
+  leggendo. Adesso un posto si perde solo uscendo dalla vista, o quando arriva
+  qualcuno che supera il più debole di una fascia intera — dieci punti, la stessa
+  unità delle preferenze. Senza quel margine due moduli che oscillano intorno allo
+  stesso valore si passerebbero il posto all'infinito, che è il difetto di prima
+  spostato di un livello.
 
 **La lista delle soglie è anche la lista delle priorità**: si trascina per maniglia e l'ordine
 che ne esce è la tua preferenza. Non scavalca l'urgenza — un disco in avaria resta in cima
@@ -74,6 +82,19 @@ sono la stessa cosa, 95 e 82 no.
 **Quando la macchina è tranquilla** la vista non si svuota: mostra i tre col punteggio più
 alto e lo dichiara in cima, «tutto tranquillo». Una schermata vuota sembra rotta, e a riposo è
 proprio quando la si apre per controllare che sia tutto a posto.
+
+**Quanti riquadri per pagina lo decide lo schermo**, non un numero scelto a mano: la vista
+misura l'altezza disponibile e chiede a ogni modulo quanto occuperà coi dati che ha adesso —
+una classifica sa quante voci ha, le temperature quanti sensori. Si riempie finché ci sta, con
+un minimo di tre: una pagina da due card con la rotazione che parte è peggio di un filo di
+scorrimento. Con i riquadri leggeri se ne vedono cinque o sei, con temperature e connessioni
+insieme tre.
+
+Le stime di altezza sono scritte a mano e si disallineerebbero in silenzio al primo cambio di
+imbottitura, col sintomo di una card che sborda dal fondo. Per questo
+`test/module_height_test.dart` renderizza ogni modulo con dati veri quanto basta e confronta
+la stima con l'altezza vera, fallendo se divergono — sottostimare ha la tolleranza stretta,
+perché è il difetto che fa traboccare la pagina.
 
 **Quando i moduli attivi sono più di quanti ne stiano in una schermata** le pagine ruotano da
 sole ogni otto secondi. Al primo tocco — anche solo l'inizio di uno scorrimento — la rotazione

@@ -190,6 +190,86 @@ void main() {
     });
   });
 
+  group('posti stabili', () {
+    test('un riquadro non si sposta perché un punteggio ha cambiato ordine', () {
+      monitor.update({'net': 91, 'ram': 90, 'cpu': 89});
+      expect(monitor.active.map((m) => m.id).toList(), ['net', 'ram', 'cpu']);
+
+      // La RAM supera la rete. Prima questo scambiava due card sotto gli
+      // occhi di chi le stava leggendo, ogni due secondi, senza che fosse
+      // successo niente.
+      monitor.update({'net': 91, 'ram': 96, 'cpu': 89});
+      expect(monitor.active.map((m) => m.id).toList(), ['net', 'ram', 'cpu'],
+          reason: 'chi è seduto resta dov\'è');
+    });
+
+    test('chi esce libera il posto e i successivi scalano', () {
+      monitor.update({'net': 91, 'ram': 90, 'cpu': 89});
+      clock.advance(60);
+      monitor.update({'net': 91, 'ram': 50, 'cpu': 89});
+      expect(monitor.active.map((m) => m.id).toList(), ['net', 'cpu']);
+    });
+
+    test('un nuovo prende il posto solo se supera di una fascia intera', () {
+      monitor.update({'net': 85, 'ram': 84, 'cpu': 83});
+      expect(monitor.active.length, 3, reason: 'la pagina è piena');
+
+      // Un disco in avaria sta due fasce sopra il più debole: si siede al
+      // suo posto, e il più debole scala in coda.
+      monitor.update({'net': 85, 'ram': 84, 'cpu': 83, 'disks': 100});
+      expect(monitor.active.map((m) => m.id).toList(),
+          ['net', 'ram', 'disks', 'cpu']);
+    });
+
+    test('chi non supera si accoda invece di scalzare', () {
+      monitor.update({'net': 85, 'ram': 84, 'cpu': 83});
+      // Stessa fascia del più debole: non basta per togliergli il posto,
+      // altrimenti due moduli che oscillano se lo passerebbero all'infinito.
+      monitor.update({'net': 85, 'ram': 84, 'cpu': 83, 'temps': 88});
+      expect(monitor.active.map((m) => m.id).toList(),
+          ['net', 'ram', 'cpu', 'temps']);
+    });
+
+    test('a riposo i posti sono altrettanto fermi', () {
+      monitor.update({'cpu': 12, 'ram': 11, 'net': 10, 'temps': 9});
+      expect(monitor.calm, isTrue);
+      final seated = monitor.active.map((m) => m.id).toList();
+      expect(seated.length, 3, reason: 'a riposo non c\'è coda');
+
+      monitor.update({'cpu': 12, 'ram': 14, 'net': 10, 'temps': 9});
+      expect(monitor.active.map((m) => m.id).toList(), seated);
+    });
+  });
+
+  group('capienza', () {
+    test('sotto tre non si scende', () {
+      monitor.setCapacity(1);
+      expect(monitor.capacity, 3);
+    });
+
+    test('con più posti non si ruota, perché entrano tutti', () {
+      monitor.setCapacity(6);
+      monitor.update({
+        'cpu': 99, 'topcpu': 98, 'ram': 95, 'net': 94, 'disks': 93, 'temps': 92,
+      });
+      expect(monitor.active.length, 6);
+      expect(monitor.pageCount, 1, reason: 'niente da ruotare');
+    });
+
+    test('allargare la capienza fa salire chi era in coda', () {
+      monitor.update({
+        'cpu': 99, 'topcpu': 98, 'ram': 95, 'net': 94,
+      });
+      expect(monitor.pageCount, 2);
+      expect(monitor.currentPage.length, 3);
+
+      monitor.setCapacity(4);
+      expect(monitor.pageCount, 1);
+      expect(monitor.currentPage.map((m) => m.id).toList(),
+          ['cpu', 'topcpu', 'ram', 'net']);
+    });
+  });
+
   group('pagine', () {
     test('si impagina e la sottoscrizione le copre tutte', () {
       monitor.update({

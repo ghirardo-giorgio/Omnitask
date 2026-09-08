@@ -59,8 +59,11 @@ void main() {
     // Solo due moduli: quello che non si guarda non deve arrivare.
     client.subscribe({'cpu', 'ram'}, {'cpu', 'memory'});
 
+    // Si aspetta la serie che si è chiesta, non una serie qualunque: con un
+    // altro telefono collegato, «`series` è arrivato» era vero anche quando
+    // dentro c'erano le metriche dell'altro.
     await _until(
-      () => client.snapshot['overview'] != null && client.snapshot['series'] != null,
+      () => client.snapshot['overview'] != null && client.snapshot.series('cpu') != null,
       'primo dato',
     );
 

@@ -40,12 +40,14 @@ final List<ModuleSpec> _all = [
     section: sectionSystem,
     metrics: ['cpu'],
     build: (context, snapshot) => cpuModule(snapshot),
+    heightFor: chartWithSubtitleHeight,
   ),
   ModuleSpec(
     id: 'topcpu',
     title: 'Classifica CPU',
     section: sectionSystem,
     build: (context, snapshot) => topCpuModule(snapshot),
+    heightFor: topCpuHeight,
   ),
   ModuleSpec(
     id: 'ram',
@@ -53,12 +55,14 @@ final List<ModuleSpec> _all = [
     section: sectionSystem,
     metrics: ['memory'],
     build: (context, snapshot) => ramModule(snapshot),
+    heightFor: chartWithSubtitleHeight,
   ),
   ModuleSpec(
     id: 'topram',
     title: 'Classifica RAM',
     section: sectionSystem,
     build: (context, snapshot) => topRamModule(snapshot),
+    heightFor: topRamHeight,
   ),
   ModuleSpec(
     id: 'gpu',
@@ -66,12 +70,14 @@ final List<ModuleSpec> _all = [
     section: sectionSystem,
     metrics: ['gpu'],
     build: (context, snapshot) => gpuModule(snapshot),
+    heightFor: chartWithSubtitleHeight,
   ),
   ModuleSpec(
     id: 'topgpu',
     title: 'Classifica GPU',
     section: sectionSystem,
     build: (context, snapshot) => topGpuModule(snapshot),
+    heightFor: topGpuHeight,
   ),
   ModuleSpec(
     id: 'vram',
@@ -79,6 +85,7 @@ final List<ModuleSpec> _all = [
     section: sectionSystem,
     metrics: ['vram'],
     build: (context, snapshot) => vramModule(snapshot),
+    heightFor: chartWithSubtitleHeight,
   ),
   ModuleSpec(
     id: 'power',
@@ -86,6 +93,7 @@ final List<ModuleSpec> _all = [
     section: sectionSystem,
     metrics: ['power_cpu', 'power_gpu'],
     build: (context, snapshot) => powerModule(snapshot),
+    heightFor: chartWithSubtitleHeight,
   ),
   ModuleSpec(
     id: 'freq',
@@ -99,18 +107,21 @@ final List<ModuleSpec> _all = [
     title: 'Temperature',
     section: sectionHealth,
     build: (context, snapshot) => tempsModule(snapshot),
+    heightFor: tempsHeight,
   ),
   ModuleSpec(
     id: 'disks',
     title: 'Dischi',
     section: sectionHealth,
     build: (context, snapshot) => disksModule(snapshot),
+    heightFor: disksHeight,
   ),
   ModuleSpec(
     id: 'health',
     title: 'Stato sistema',
     section: sectionHealth,
     build: (context, snapshot) => healthModule(snapshot),
+    heightFor: healthHeight,
   ),
   ModuleSpec(
     id: 'pressure',
@@ -118,6 +129,7 @@ final List<ModuleSpec> _all = [
     section: sectionHealth,
     metrics: ['psi_cpu', 'psi_io', 'psi_mem'],
     build: (context, snapshot) => pressureModule(snapshot),
+    heightFor: pressureHeight,
   ),
   ModuleSpec(
     id: 'net',
@@ -125,18 +137,21 @@ final List<ModuleSpec> _all = [
     section: sectionNetwork,
     metrics: ['net_rx', 'net_tx'],
     build: (context, snapshot) => netModule(snapshot),
+    heightFor: netHeight,
   ),
   ModuleSpec(
     id: 'connections',
     title: 'Connessioni',
     section: sectionNetwork,
     build: (context, snapshot) => connectionsModule(snapshot),
+    heightFor: connectionsHeight,
   ),
   ModuleSpec(
     id: 'homeassistant',
     title: 'Home Assistant',
     section: sectionHome,
     build: (context, snapshot) => homeAssistantModule(snapshot),
+    heightFor: homeAssistantHeight,
   ),
   ModuleSpec(
     id: 'solar',
@@ -147,6 +162,7 @@ final List<ModuleSpec> _all = [
     // evita di dipendere da cosa l'utente ha scelto nelle opzioni.
     metrics: ['ha:sensor.solare_usb_potenza'],
     build: (context, snapshot) => solarModule(snapshot),
+    heightFor: solarHeight,
   ),
   ModuleSpec(
     id: 'igrometro',
@@ -154,12 +170,14 @@ final List<ModuleSpec> _all = [
     section: sectionHome,
     metrics: ['ha:sensor.igrometro_umidita'],
     build: (context, snapshot) => igrometroModule(snapshot),
+    heightFor: igrometroHeight,
   ),
   ModuleSpec(
     id: 'weather',
     title: 'Meteo',
     section: sectionHome,
     build: (context, snapshot) => weatherModule(snapshot),
+    heightFor: weatherHeight,
   ),
   ModuleSpec(
     id: 'heart',
@@ -167,18 +185,21 @@ final List<ModuleSpec> _all = [
     section: sectionBody,
     metrics: ['heart'],
     build: (context, snapshot) => heartModule(snapshot),
+    heightFor: heartHeight,
   ),
   ModuleSpec(
     id: 'inspire',
     title: 'Inspire 3',
     section: sectionBody,
     build: (context, snapshot) => inspireModule(snapshot),
+    heightFor: inspireHeight,
   ),
   ModuleSpec(
     id: 'phones',
     title: 'Telefoni',
     section: sectionDevices,
     build: (context, snapshot) => phonesModule(snapshot),
+    heightFor: phonesHeight,
   ),
 ];
 

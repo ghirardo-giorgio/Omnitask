@@ -80,13 +80,11 @@ class _ActivitySettingsScreenState extends State<ActivitySettingsScreen> {
             },
           ),
           const Divider(color: AppColors.borderMuted),
-          _stepper(
-            'Moduli per pagina',
-            rules.perPage,
-            2,
-            6,
-            (value) => _apply(rules.copyWith(perPage: value)),
-          ),
+          // Quanti riquadri per pagina non si sceglie più: li conta la vista
+          // guardando quanto è alto lo schermo e quanto occupa ognuno coi
+          // dati di adesso. Un numero fisso sbagliava in tutte e due le
+          // direzioni — tre card leggere lasciavano mezzo schermo vuoto, tre
+          // card alte già traboccavano.
           _stepper(
             'Secondi fra una pagina e l\'altra',
             rules.rotateSeconds,

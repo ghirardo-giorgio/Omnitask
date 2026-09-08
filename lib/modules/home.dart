@@ -170,3 +170,44 @@ Widget weatherModule(Snapshot snapshot) {
     ),
   );
 }
+
+// --- quanto occupano -------------------------------------------------------
+
+double homeAssistantHeight(Snapshot snapshot) {
+  final ha = snapshot['home_assistant'];
+  if (ha == null || ha['ok'] == false) return AppMetrics.cardWithChart();
+  final chosen = (ha['chosen'] as List?) ?? const [];
+  if (chosen.isEmpty) return AppMetrics.cardWithChart(subtitle: true);
+  final noChart = (ha['chosen_without_chart'] as List?)?.map((e) => e.toString()).toSet() ?? {};
+  var content = 0.0;
+  for (final id in chosen) {
+    content += AppMetrics.rowHeight;
+    // Le entita' col grafico ne portano uno piccolo sotto la riga.
+    final series = snapshot.series('ha:$id');
+    if (!noChart.contains(id.toString()) && series != null && !series.isEmpty) {
+      content += 34;
+    }
+  }
+  return AppMetrics.card(content, subtitle: true);
+}
+
+double solarHeight(Snapshot snapshot) {
+  if (snapshot['home_assistant'] == null) return AppMetrics.cardWithChart();
+  final series = snapshot.series('ha:sensor.solare_usb_potenza');
+  final chart = series != null && !series.isEmpty ? AppMetrics.sparklineHeight : 0.0;
+  return AppMetrics.card(chart + AppMetrics.rowHeight * 2);
+}
+
+double igrometroHeight(Snapshot snapshot) => AppMetrics.cardWithChart();
+
+double weatherHeight(Snapshot snapshot) {
+  final ha = snapshot['home_assistant'];
+  if (ha == null) return AppMetrics.cardWithChart();
+  final entities = (ha['entities'] as List?) ?? const [];
+  final weather = entities
+      .whereType<Map>()
+      .where((e) => e['entity_id'].toString().startsWith('weather.'))
+      .length;
+  if (weather == 0) return AppMetrics.cardWithChart();
+  return AppMetrics.cardWithRows(weather);
+}

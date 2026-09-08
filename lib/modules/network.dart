@@ -111,3 +111,27 @@ String _where(Map peer) {
   final hostname = peer['hostname']?.toString() ?? '';
   return hostname.isNotEmpty ? hostname : (peer['ip']?.toString() ?? '');
 }
+
+// --- quanto occupano -------------------------------------------------------
+
+double netHeight(Snapshot snapshot) {
+  if (snapshot['overview']?['network'] == null) {
+    return AppMetrics.cardWithChart();
+  }
+  // Le due frecce col traffico, poi il grafico.
+  return AppMetrics.card(
+    AppMetrics.rowText + AppMetrics.gapSmall + AppMetrics.sparklineHeight,
+    subtitle: true,
+  );
+}
+
+double connectionsHeight(Snapshot snapshot) {
+  final connections = snapshot['connections'];
+  if (connections == null) return AppMetrics.cardWithChart();
+  final peers = (connections['peers'] as List?) ?? const [];
+  final shown = peers.length > 8 ? 8 : peers.length;
+  final lan = connections['lan_peers'] as num? ?? 0;
+  final loopback = connections['loopback_peers'] as num? ?? 0;
+  return AppMetrics.cardWithRows(shown, subtitle: true) +
+      (lan > 0 || loopback > 0 ? AppMetrics.gapSmall + AppMetrics.tempLabel : 0);
+}

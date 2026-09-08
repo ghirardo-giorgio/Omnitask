@@ -208,3 +208,25 @@ Widget _ranking({
     ),
   );
 }
+
+// --- quanto occupano -------------------------------------------------------
+
+/// Le classifiche: una riga per voce, e quante voci le decide il PC
+/// (`topCount` nelle opzioni della dashboard, di solito due o tre).
+double rankingHeight(Snapshot snapshot, List? rows) {
+  if (rows == null) return AppMetrics.cardWithChart();
+  return AppMetrics.cardWithRows(rows.isEmpty ? 1 : rows.length);
+}
+
+double topCpuHeight(Snapshot snapshot) =>
+    rankingHeight(snapshot, snapshot['overview']?['busiest']?['cpu'] as List?);
+
+double topRamHeight(Snapshot snapshot) =>
+    rankingHeight(snapshot, snapshot['overview']?['busiest']?['memory'] as List?);
+
+double topGpuHeight(Snapshot snapshot) =>
+    rankingHeight(snapshot, snapshot['top_gpu']?['processes'] as List?);
+
+/// I moduli a grafico portano il sottotitolo col modello o con la misura.
+double chartWithSubtitleHeight(Snapshot snapshot) =>
+    AppMetrics.cardWithChart(subtitle: true);

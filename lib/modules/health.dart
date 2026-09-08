@@ -241,3 +241,51 @@ Widget pressureModule(Snapshot snapshot) {
     ),
   );
 }
+
+// --- quanto occupano -------------------------------------------------------
+// Le stime che la vista dinamica usa per decidere quanti riquadri stanno in
+// una pagina. Sono le stesse formule del `build` qui sopra, lette al
+// contrario: se si aggiunge una riga la' va aggiunta qui, e
+// `test/module_height_test.dart` se ne accorge se non succede.
+
+double tempsHeight(Snapshot snapshot) {
+  final rows = snapshot['health']?['temperatures_celsius'] as List?;
+  if (rows == null || rows.isEmpty) return AppMetrics.cardWithChart();
+  return AppMetrics.cardWithGrid(rows.length, 3, AppMetrics.tempTile);
+}
+
+double disksHeight(Snapshot snapshot) {
+  final health = snapshot['health'];
+  final disks = health?['disks'] as List?;
+  if (disks == null || disks.isEmpty) return AppMetrics.cardWithChart();
+  final hasSubtitle = ((health?['disks_failing'] as List?) ?? const []).isNotEmpty ||
+      ((health?['disks_needing_attention'] as List?) ?? const []).isNotEmpty;
+  return AppMetrics.cardWithGrid(
+    disks.length,
+    2,
+    AppMetrics.donutTile,
+    subtitle: hasSubtitle,
+  );
+}
+
+double healthHeight(Snapshot snapshot) =>
+    snapshot['health'] == null
+        ? AppMetrics.cardWithChart()
+        // Uptime, processi uccisi, errori di rete, lettura SMART.
+        : AppMetrics.cardWithRows(3);
+
+double pressureHeight(Snapshot snapshot) {
+  final pressure = snapshot['pressure'];
+  if (pressure?['waiting'] == null) return AppMetrics.cardWithChart();
+  final holders = (pressure?['holders'] as List?) ?? const [];
+  final shown = holders.length > 4 ? 4 : holders.length;
+  return AppMetrics.card(
+    AppMetrics.sparklineHeight +
+        AppMetrics.gapSmall +
+        AppMetrics.statBarRow * 3 +
+        (shown > 0
+            ? AppMetrics.gapSmall + AppMetrics.tempLabel + shown * AppMetrics.rowHeight
+            : 0),
+    subtitle: true,
+  );
+}

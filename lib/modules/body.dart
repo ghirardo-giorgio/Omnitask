@@ -80,3 +80,19 @@ Widget inspireModule(Snapshot snapshot) {
     ),
   );
 }
+
+// --- quanto occupano -------------------------------------------------------
+
+double heartHeight(Snapshot snapshot) {
+  final series = snapshot.series('heart');
+  if (series == null || series.isEmpty) return AppMetrics.cardWithChart();
+  return AppMetrics.cardWithChart(subtitle: true);
+}
+
+double inspireHeight(Snapshot snapshot) {
+  if (snapshot['home_assistant']?['entities'] == null) {
+    return AppMetrics.cardWithChart();
+  }
+  // Una barra per la batteria e una riga per l'ultima sincronizzazione.
+  return AppMetrics.card(AppMetrics.statBarRow + AppMetrics.rowHeight);
+}

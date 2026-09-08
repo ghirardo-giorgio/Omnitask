@@ -39,6 +39,17 @@ class ActivityMonitor extends ChangeNotifier {
   final Map<String, DateTime> _enteredAt = {};
   final Set<String> _inside = {};
 
+  /// I posti, in ordine: chi siede dove. È questa lista a non essere
+  /// ricostruita da zero a ogni campione — è tutta la stabilità della vista.
+  final List<String> _seats = [];
+
+  /// Quanti riquadri entrano in una pagata di schermo. Lo misura la vista,
+  /// che è l'unica a sapere quanto è alto lo schermo e quanto occupa ogni
+  /// modulo coi dati di adesso; qui si parte da tre, che è il minimo sotto
+  /// cui non si scende.
+  int _capacity = 3;
+  int get capacity => _capacity;
+
   List<ActiveModule> _active = const [];
   List<ActiveModule> get active => _active;
 
@@ -61,17 +72,35 @@ class ActivityMonitor extends ChangeNotifier {
   Timer? _resume;
   bool paused = false;
 
+  /// Quanti riquadri entrano davvero nello schermo, misurato dalla vista.
+  ///
+  /// Un numero fisso sbagliava in tutte e due le direzioni: tre card leggere
+  /// lasciavano mezzo schermo vuoto, tre card alte già traboccavano. Il
+  /// minimo di tre resta perché una pagina da due card con la rotazione che
+  /// parte è peggio di un filo di scorrimento.
+  void setCapacity(int seats) {
+    final wanted = seats < 3 ? 3 : seats;
+    if (wanted == _capacity) return;
+    _capacity = wanted;
+    // I posti oltre la nuova capienza tornano in gioco, e la pagina corrente
+    // può essere finita fuori dalla fine.
+    _rebuild();
+    if (_page >= pageCount) _page = 0;
+    _restartRotation();
+    notifyListeners();
+  }
+
   int get pageCount =>
-      _active.isEmpty ? 1 : ((_active.length - 1) ~/ _rules.perPage) + 1;
+      _active.isEmpty ? 1 : ((_active.length - 1) ~/ _capacity) + 1;
 
   int get page => _page.clamp(0, pageCount - 1);
 
   List<ActiveModule> get currentPage {
     if (_active.isEmpty) return const [];
-    final start = page * _rules.perPage;
+    final start = page * _capacity;
     return _active.sublist(
       start,
-      (start + _rules.perPage).clamp(0, _active.length),
+      (start + _capacity).clamp(0, _active.length),
     );
   }
 
@@ -170,30 +199,12 @@ class ActivityMonitor extends ChangeNotifier {
 
     calm = _inside.isEmpty;
 
-    final chosen = calm
-        ? (usable.entries.toList()
-              ..sort((a, b) => b.value.compareTo(a.value)))
-            .take(_rules.calmCount)
-            .map((e) => e.key)
-            .toList()
-        : _inside.toList();
-
-    // Prima l'urgenza, e a pari urgenza le preferenze. Ordinare solo per
-    // punteggio farebbe decidere la prima pagina a decimali che cambiano a
-    // ogni campione; ordinare solo per preferenze seppellirebbe un disco in
-    // avaria sotto la CPU perché la CPU sta più in alto nella lista.
-    chosen.sort((a, b) {
-      final byBand = _rules
-          .bandOf(usable[b] ?? 0)
-          .compareTo(_rules.bandOf(usable[a] ?? 0));
-      if (byBand != 0) return byBand;
-      final byRank = _rules.rankOf(a).compareTo(_rules.rankOf(b));
-      if (byRank != 0) return byRank;
-      return (usable[b] ?? 0).compareTo(usable[a] ?? 0);
-    });
+    // A riposo concorrono tutti; in allarme solo chi ha superato la soglia.
+    final contenders = calm ? usable.keys.toList() : _inside.toList();
+    _assignSeats(contenders, usable, queue: !calm);
 
     _active = [
-      for (final id in chosen)
+      for (final id in _seats)
         ActiveModule(
           id: id,
           score: usable[id] ?? 0,
@@ -203,6 +214,69 @@ class ActivityMonitor extends ChangeNotifier {
     ];
 
     if (_page >= pageCount) _page = 0;
+  }
+
+  /// Assegna i posti, cambiandone il meno possibile.
+  ///
+  /// È la regola che rende la vista leggibile: chi è già a schermo **resta
+  /// dov'è**. Riordinare per punteggio a ogni campione voleva dire che la RAM
+  /// passando da 52 a 53 scavalcava la rete e due card si scambiavano di
+  /// posto — mentre le stai leggendo, e senza che fosse successo niente.
+  ///
+  /// Un posto si perde solo in due modi: uscendo dalla vista, o venendo
+  /// rimpiazzati da qualcuno che merita davvero. «Davvero» è una fascia
+  /// intera di scarto (dieci punti, la stessa unità delle preferenze):
+  /// senza quel margine due moduli che oscillano intorno allo stesso valore
+  /// si passerebbero il posto in continuazione, che è il difetto di partenza
+  /// spostato di un livello.
+  void _assignSeats(
+    List<String> contenders,
+    Map<String, double> usable, {
+    required bool queue,
+  }) {
+    _seats.removeWhere((id) => !contenders.contains(id));
+
+    // A riposo non c'è una coda: quello che non entra nella pagina non si
+    // mostra affatto, invece di far ruotare pagine di moduli tranquilli.
+    if (!queue && _seats.length > _capacity) {
+      _seats.removeRange(_capacity, _seats.length);
+    }
+
+    double scoreOf(String id) => usable[id] ?? 0;
+
+    final incoming = contenders.where((id) => !_seats.contains(id)).toList()
+      ..sort((a, b) {
+        // Fra chi aspetta di entrare l'ordine conta eccome: prima l'urgenza,
+        // a pari urgenza le preferenze. È qui che `bandOf` e `rankOf`
+        // servono davvero — per decidere chi si siede, non per rimescolare
+        // chi è già seduto.
+        final byBand = _rules.bandOf(scoreOf(b)).compareTo(_rules.bandOf(scoreOf(a)));
+        if (byBand != 0) return byBand;
+        final byRank = _rules.rankOf(a).compareTo(_rules.rankOf(b));
+        if (byRank != 0) return byRank;
+        return scoreOf(b).compareTo(scoreOf(a));
+      });
+
+    for (final id in incoming) {
+      // Un posto libero nella pagina che si vede: ci si accomoda e basta.
+      if (_seats.length < _capacity) {
+        _seats.add(id);
+        continue;
+      }
+
+      var weakest = 0;
+      for (var seat = 1; seat < _capacity && seat < _seats.length; seat++) {
+        if (scoreOf(_seats[seat]) < scoreOf(_seats[weakest])) weakest = seat;
+      }
+
+      if (_rules.bandOf(scoreOf(id)) > _rules.bandOf(scoreOf(_seats[weakest]))) {
+        final displaced = _seats[weakest];
+        _seats[weakest] = id;
+        if (queue) _seats.add(displaced);
+      } else if (queue) {
+        _seats.add(id);
+      }
+    }
   }
 
   @override
