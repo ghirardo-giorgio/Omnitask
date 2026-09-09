@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Artefatti di build iOS
+# L'IPA lo costruisce Actions a ogni push e lo scarica ./tools/install_ios.py:
+# tenerne una copia qui vuol dire versionare sette megabyte che cambiano a
+# ogni commit, e che possono essere più vecchi del codice accanto.
+*.ipa
