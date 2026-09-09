@@ -14,6 +14,11 @@ String formatFingerprint(List<int> bytes) => bytes
     .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
     .join(':');
 
+/// Le sorgenti che il ponte serve anche a dashboard spenta: kdeconnect
+/// risponde da solo. Vederne arrivare una non dice niente sulla dashboard;
+/// vedere arrivare qualsiasi altra cosa dice che e' viva.
+const _sourcesWithoutDashboard = {'phones'};
+
 /// Il certificato presentato dal PC non e' quello accettato la prima volta.
 /// O il ponte e' stato reinstallato (certificato rigenerato), o qualcuno
 /// sulla stessa rete si sta spacciando per il PC. Da qui le due cose non si
@@ -209,6 +214,12 @@ class BridgeClient extends ChangeNotifier {
       case 'auth':
         if (message['ok'] == true) {
           status = ConnectionStatus.connected;
+          // Il guasto visto prima della caduta apparteneva alla sessione di
+          // prima: il `recovered` che lo chiudeva puo' essere passato mentre
+          // eravamo scollegati, e un ponte riavviato riparte comunque senza
+          // memoria del guasto. Se e' ancora spenta lo ridice lui.
+          dashboardError = null;
+          dashboardDownSince = null;
           hostName = message['host']?.toString();
           final modules = message['modules'];
           if (modules is List) {
@@ -247,7 +258,10 @@ class BridgeClient extends ChangeNotifier {
 
       case 'update':
         final sources = message['sources'];
-        if (sources is Map<String, dynamic>) snapshot.absorb(sources);
+        if (sources is Map<String, dynamic>) {
+          _dashboardAnswered(sources);
+          snapshot.absorb(sources);
+        }
         version++;
         _notify();
         break;
@@ -279,6 +293,23 @@ class BridgeClient extends ChangeNotifier {
         _notify();
         break;
     }
+  }
+
+  /// Sono arrivate misure appena prese, quindi la dashboard risponde: il
+  /// cartello va tolto senza aspettare il `recovered`. Quel messaggio e'
+  /// l'annuncio del ritorno, non la prova: si perde se il telefono e' giu'
+  /// proprio in quel momento, e un ponte riavviato non lo manda affatto.
+  /// Cosi' il cartello non puo' sopravvivere ai dati che smentisce.
+  ///
+  /// Uno `snapshot` non basta — quello lo serve la cache del ponte, e a
+  /// dashboard spenta e' vecchio di quanto dura il guasto.
+  void _dashboardAnswered(Map<String, dynamic> sources) {
+    if (dashboardError == null) return;
+    final live =
+        sources.keys.any((name) => !_sourcesWithoutDashboard.contains(name));
+    if (!live) return;
+    dashboardError = null;
+    dashboardDownSince = null;
   }
 
   void _send(Socket socket, Map<String, dynamic> message) {
